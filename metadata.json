@@ -1,0 +1,6 @@
+{
+  "name": "GitHub Apps Launcher",
+  "description": "A mobile-first dashboard to launch my GitHub Pages apps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
