@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { Plus, X, ExternalLink, Github, LayoutGrid, Trash2 } from 'lucide-react';
+import { Plus, X, ExternalLink, Github, LayoutGrid, Trash2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface GitHubApp {
@@ -20,41 +20,72 @@ const COLORS = [
   'from-indigo-500 to-blue-500',
 ];
 
-const DEFAULT_APPS: GitHubApp[] = [
-  {
-    id: '1',
-    name: 'My Portfolio',
-    url: 'https://github.com',
-    color: COLORS[0],
-  },
-];
+const GITHUB_USERNAME = 'trevor3002';
 
 export default function App() {
   const [apps, setApps] = useState<GitHubApp[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [newAppName, setNewAppName] = useState('');
   const [newAppUrl, setNewAppUrl] = useState('');
 
-  // Load from local storage
+  // Load from local storage on mount
   useEffect(() => {
     const saved = localStorage.getItem('github_launcher_apps');
     if (saved) {
       try {
         setApps(JSON.parse(saved));
       } catch (e) {
-        setApps(DEFAULT_APPS);
+        setApps([]);
       }
     } else {
-      setApps(DEFAULT_APPS);
+      // If no apps saved, try to sync automatically
+      syncFromGitHub();
     }
   }, []);
 
-  // Save to local storage
+  // Save to local storage whenever apps change
   useEffect(() => {
     if (apps.length > 0) {
       localStorage.setItem('github_launcher_apps', JSON.stringify(apps));
     }
   }, [apps]);
+
+  const syncFromGitHub = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=updated`);
+      if (!res.ok) throw new Error('Failed to fetch from GitHub');
+      const data = await res.json();
+      
+      const pagesRepos = data.filter((repo: any) => repo.has_pages);
+      
+      const newApps: GitHubApp[] = pagesRepos.map((repo: any, index: number) => {
+        let url = repo.homepage || `https://${repo.owner.login}.github.io/${repo.name}`;
+        if (url && !url.startsWith('http')) {
+          url = `https://${url}`;
+        }
+        
+        return {
+          id: repo.id.toString(),
+          name: repo.name.replace(/[-_]/g, ' '),
+          url: url,
+          color: COLORS[index % COLORS.length],
+        };
+      });
+      
+      setApps(prevApps => {
+        // Merge without duplicating existing URLs
+        const existingUrls = new Set(prevApps.map(a => a.url));
+        const uniqueNewApps = newApps.filter(a => !existingUrls.has(a.url));
+        return [...prevApps, ...uniqueNewApps];
+      });
+    } catch (error) {
+      console.error("Error syncing GitHub repos:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleAddApp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,7 +113,12 @@ export default function App() {
   const deleteApp = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setApps(apps.filter(app => app.id !== id));
+    
+    const newApps = apps.filter(app => app.id !== id);
+    setApps(newApps);
+    if (newApps.length === 0) {
+      localStorage.removeItem('github_launcher_apps');
+    }
   };
 
   return (
@@ -94,7 +130,18 @@ export default function App() {
             <LayoutGrid className="w-5 h-5 text-blue-400" />
             <h1 className="font-semibold text-lg tracking-tight">Launcher</h1>
           </div>
-          <PWAInstallButton />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={syncFromGitHub}
+              disabled={isSyncing}
+              className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/50 px-3 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors disabled:opacity-50"
+              title={`Sync apps from @${GITHUB_USERNAME}`}
+            >
+              <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-blue-400' : ''}`} />
+              <span className="hidden sm:inline">Sync {GITHUB_USERNAME}</span>
+            </button>
+            <PWAInstallButton />
+          </div>
         </div>
       </header>
 
