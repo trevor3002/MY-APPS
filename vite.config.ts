@@ -16,15 +16,12 @@ export default defineConfig(() => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
         manifest: {
-          id: '/',
           name: 'App Launcher',
           short_name: 'Launcher',
           description: 'A mobile-first dashboard to launch my GitHub Pages apps.',
           theme_color: '#0f172a',
           background_color: '#0f172a',
           display: 'standalone',
-          start_url: '/',
-          scope: '/',
           icons: [
             {
               src: 'icon.svg',
